@@ -38,14 +38,15 @@ import (
 )
 
 var (
-	cfg      *config.Config
-	mailerr  chan error = make(chan error, 1)
-	quit     chan int   = make(chan int, 1)
-	reloaded chan int   = make(chan int, 1)
+	err     error
+	cfg     *config.Config
+	mailerr chan error = make(chan error, 1)
+	quit    chan int   = make(chan int, 1)
+	reload  chan int   = make(chan int, 1)
 )
 
 // fetch gets the file and checks its contents
-// A non-nil error is returned iff either:
+// A non-nil error is returned if:
 //   - the file is empty, or
 //   - the file could not be retreived, or
 //   - the file starts with something else then '.' (Note that most
@@ -66,7 +67,7 @@ func fetch(url string) error {
 	}
 
 	if str := string(content[0]); str != "." {
-		return fmt.Errorf("not '.': '%s'", str)
+		return fmt.Errorf("got '%s'", str)
 	}
 
 	return nil
@@ -80,7 +81,8 @@ func mail(cfg *config.Config) error {
 	m.SetHeader("Subject", cfg.Subject)
 	m.SetBody("text/plain", cfg.Body)
 	d := gomail.Dialer{Host: cfg.Host, Port: cfg.Port}
-	go func() { // run in goroutine, so we can enforce a timeout
+	go func() {
+		// run in separate goroutine, so we can enforce a timeout
 		mailerr <- d.DialAndSend(m)
 	}()
 	return mailWait(time.Second * 5)
@@ -102,7 +104,7 @@ func initLog() error {
 	filename := os.Getenv("HOME") + "/polldot.log"
 	fd, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("can not open file: %+v", err)
+		return err
 	}
 
 	log.SetOutput(io.Writer(fd))
@@ -113,15 +115,15 @@ func initLog() error {
 
 // initConfig fills the cfg variable
 func initConfig() error {
-	var err error
 	cfg, err = config.Load()
 	return err
 }
 
-// wait waits for os signals SIGHUP, SIGINT, SIGTERM and SIGUSR1.
+// catchSignals catches signals SIGHUP, SIGINT, SIGTERM and SIGUSR1.
 // SIGHUP triggers a reload of the configuration.
 // SIGINT, SIGTERM and SIGUSR1 will make the program exit.
-func wait() {
+func catchSignals() {
+
 	signals := make(chan os.Signal, 1)
 	signal.Notify(
 		signals,
@@ -132,30 +134,53 @@ func wait() {
 	log.Println("waiting for signals ...")
 
 	for sig := range signals {
-		log.Printf("receiving signal: %+v\n", sig)
-
+		log.Printf("received signal: %+v\n", sig)
 		switch sig {
-
 		case syscall.SIGHUP:
-			cfgOld := cfg
-			err := initConfig()
-			if err != nil {
-				log.Printf("not using new config: %+v\n", err)
-				cfg = cfgOld
-			}
-			log.Printf("new configuration: %+v\n", cfg)
-			reloaded <- 1
-
+			reload <- 1
 		case syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1:
 			quit <- 1
 		}
 	}
 }
 
-// init initializes logging and loads configuration
-func init() {
-	var err error
+// pollLoop is the main fetch/main loop of the program.
+func pollLoop() string {
+	for {
+		select {
 
+		case <-quit:
+			return "exit."
+
+		case <-reload:
+
+			cfgOld := cfg
+			err = initConfig()
+			if err != nil {
+				log.Printf("not using new config; %+v\n", err)
+				cfg = cfgOld
+			}
+			log.Printf("configuration: %+v\n", cfg)
+
+		case <-time.After(cfg.Sleep):
+
+			err = fetch(cfg.URL)
+			if err != nil {
+				log.Println(err)
+				continue // retry again later
+			}
+			err = mail(cfg)
+			if err != nil {
+				return err.Error()
+			}
+			return "mail sent"
+		}
+	}
+}
+
+func main() {
+
+	// initialize logging
 	err = initLog()
 	if err != nil {
 		log.Fatal(err)
@@ -163,42 +188,17 @@ func init() {
 	log.Println("")
 	log.Println("polldot started")
 
+	// initialize configuration
 	err = initConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("configuration: %+v\n", cfg)
-}
 
-// main tries to fetch a file until it succeeds.
-// Then it sends a mail and exits.
-func main() {
-	go wait()
+	// start signal handler
+	go catchSignals()
 
-	for {
-		select {
-
-		case <-quit:
-			log.Println("exit.")
-			return
-
-		case <-reloaded:
-			// use new cfg.Sleep value immediately
-			continue
-
-		case <-time.After(cfg.Sleep):
-			err := fetch(cfg.URL)
-			if err == nil {
-				err = mail(cfg)
-				if err != nil {
-					log.Println(err)
-				} else {
-					log.Println("mail sent")
-				}
-				quit <- 1
-			} else {
-				log.Println(err)
-			}
-		}
-	}
+	// start the main fetch/mail loop
+	returnStr := pollLoop()
+	log.Println(returnStr)
 }

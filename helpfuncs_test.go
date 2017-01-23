@@ -1,18 +1,26 @@
 package main
 
 import (
-	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"net/textproto"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 )
 
+// handler functions for http.Handle()
+
 func valid(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, "%s", ".")
+	io.WriteString(w, ".")
 }
-func invalid(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, "%s", "invalid content")
+func notadot(w http.ResponseWriter, req *http.Request) {
+	io.WriteString(w, "this does not start with '.'")
+}
+func empty(w http.ResponseWriter, req *http.Request) {
+	io.WriteString(w, "")
 }
 
 var hasFlipped bool = false
@@ -22,16 +30,14 @@ func flipping(w http.ResponseWriter, req *http.Request) {
 		valid(w, req)
 		return
 	}
-	invalid(w, req)
+	empty(w, req)
 	hasFlipped = true
 }
 
-// testFatal is a helper function. It runs a subtest by starting gorun
-// again, this time using -test.run flag and setting an environment variable.
-//
-// This way we can test functions that should can end with an exit(1), like
-// with a log.Fatal(). TODO see if this also works for exit(2) and
-// friends. This way of testing these functions is found here:
+// testFatal is a helper function. It runs a subtest by starting go
+// test again, this time using -test.run flag and setting an
+// environment variable.
+// This way of testing functions ending in exit(1) is found here:
 // http://stackoverflow.com/questions/30688554/how-to-test-go-function-containing-log-fatal
 func testFatal(envvar string, f func(), regexp string, t *testing.T) {
 	if os.Getenv(envvar) == "1" {
@@ -45,4 +51,64 @@ func testFatal(envvar string, f func(), regexp string, t *testing.T) {
 		return
 	}
 	t.Errorf("process ran with err %v, want exit status 1", err)
+}
+
+var sendMailServer = `220 hello world
+502 EH?
+250 mx.google.com at your service
+250 Sender ok
+250 Receiver ok
+354 Go ahead
+250 Data ok
+221 Goodbye
+`
+var serverChat = strings.Split(sendMailServer, "\n")
+
+// mailServer is a stub smtp server for testing.
+// Honoustly stolen from smtp_test.go
+func mailServer(addr string, t *testing.T) {
+
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		t.Fatalf("Unable to to create listener: %v", err)
+	}
+	defer l.Close()
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			t.Errorf("Accept error: %v", err)
+			return
+		}
+		handleOne(conn, t)
+		conn.Close()
+	}
+}
+
+func handleOne(c net.Conn, t *testing.T) {
+
+	tc := textproto.NewConn(c)
+
+	for i := 0; i < len(serverChat); i++ {
+		// serverChat is the slice of server replies
+		tc.PrintfLine(serverChat[i])
+
+		if serverChat[i] == "221 Goodbye" {
+			return
+		}
+
+		reading := false
+	body:
+		for !reading || serverChat[i] == "354 Go ahead" {
+			msg, err := tc.ReadLine()
+			reading = true
+			if err != nil {
+				t.Errorf("Read error: %v", err)
+				return
+			}
+			if serverChat[i] == "354 Go ahead" && msg == "." {
+				break body
+			}
+		}
+	}
 }
