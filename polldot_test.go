@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ajaapps/pract/polldot/config"
+	"github.com/ajaapps/polldot/config"
 )
 
 var err error

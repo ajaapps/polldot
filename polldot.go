@@ -33,7 +33,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ajaapps/pract/polldot/config"
+	"github.com/ajaapps/polldot/config"
 	"github.com/go-gomail/gomail"
 )
 
