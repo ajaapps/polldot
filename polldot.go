@@ -183,6 +183,8 @@ func main() {
 	// initialize logging
 	err = initLog()
 	if err != nil {
+		log.Println(err)
+		log.SetOutput(os.Stderr)
 		log.Fatal(err)
 	}
 	log.Println("")
@@ -191,6 +193,8 @@ func main() {
 	// initialize configuration
 	err = initConfig()
 	if err != nil {
+		log.Println(err)
+		log.SetOutput(os.Stderr)
 		log.Fatal(err)
 	}
 	log.Printf("configuration: %+v\n", cfg)
@@ -200,5 +204,8 @@ func main() {
 
 	// start the main fetch/mail loop
 	returnStr := pollLoop()
+
+	log.Println(returnStr)
+	log.SetOutput(os.Stderr)
 	log.Println(returnStr)
 }
