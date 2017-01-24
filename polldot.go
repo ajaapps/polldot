@@ -38,11 +38,12 @@ import (
 )
 
 var (
-	err     error
-	cfg     *config.Config
-	mailerr chan error = make(chan error, 1)
-	quit    chan int   = make(chan int, 1)
-	reload  chan int   = make(chan int, 1)
+	err         error
+	cfg         *config.Config
+	mailerr     chan error    = make(chan error, 1)
+	quit        chan int      = make(chan int, 1)
+	reload      chan int      = make(chan int, 1)
+	mailTimeout time.Duration = time.Second * 5
 )
 
 // fetch gets the file and checks its contents
@@ -85,7 +86,7 @@ func mail(cfg *config.Config) error {
 		// run in separate goroutine, so we can enforce a timeout
 		mailerr <- d.DialAndSend(m)
 	}()
-	return mailWait(time.Second * 5)
+	return mailWait(mailTimeout)
 }
 
 // mailWait waits for either mail result or timeout,
