@@ -163,14 +163,12 @@ func TestInitLog(t *testing.T) {
 
 }
 
-// TestInitConfig implicitely also tests the config package
-// TODO use initTest()
+// TestInitConfig implicitely also tests parts of the config package
 func TestInitConfig(t *testing.T) {
-	configfile := os.Getenv("HOME") + "/.polldot.json"
 
+	// homedir does not exist -> error
 	t.Run("nosuchdir", func(t *testing.T) {
-		// config.Load returns non-nil error
-		defer os.Setenv("HOME", os.Getenv("HOME"))
+		initTest()
 		os.Setenv("HOME", "/tmp/this/should/not/exist/at/all")
 
 		err := initConfig()
@@ -179,35 +177,35 @@ func TestInitConfig(t *testing.T) {
 		}
 	})
 
+	// no config file -> error
 	t.Run("nofile", func(t *testing.T) {
-		// no config file -> error
-		os.Remove(configfile)
+		initTest()
+		os.Remove(os.Getenv("HOME") + "/.polldot.json")
 
 		err := initConfig()
-		defer os.Remove(configfile)
 
 		expected := "edit config file and retry"
 		if err != nil {
 			if err.Error() != expected {
 				t.Errorf("expecting '%s' error, got '%s'", expected, err)
 			}
-		} else { // err == nil
-			t.Errorf("expecting '%s' error, got nil", expected)
+		} else {
+			t.Errorf("expecting '%s' error, got <nil>", expected)
 		}
 
 	})
 
+	// config.Load successful -> no error, expected content
 	t.Run("normal", func(t *testing.T) {
-		// config.Load successful -> no error, expected content
-		os.Remove(configfile)
-		initConfig() // just to create a vanilla config file
+		initTest()
+		cfg = new(config.Config)
 
 		err := initConfig()
 		if err != nil {
 			t.Errorf("expecting nil, got %+v", err)
 		}
 
-		defaultCfg := &config.Config{URL: "http://www.example.net/path/dotfile", From: "from@some.host.net", To: "to@another.host.org", Subject: "subject text", Body: "Contents\nof the mail body.\n", Host: "smtp.mailserver.org", Port: 25, CycleLen: 10, CycleUnit: "minutes", Sleep: 600000000000}
+		defaultCfg := testCfg()
 
 		if !reflect.DeepEqual(*cfg, *defaultCfg) {
 			t.Errorf("\nExpected: %#v ,\n     got: %#v", *defaultCfg, *cfg)

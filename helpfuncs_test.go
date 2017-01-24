@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -23,20 +25,32 @@ import (
 // (4) create an empty log file
 // Test servers are started from init() in polldot_test.go.
 func initTest() {
+
+	// (1) setting the HOME environment variable to 'testdata'
 	err = os.Setenv("HOME", "testdata")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	// (2) setting cfg to a sane test value where the testservers are
+	// being used
 	cfg = testCfg()
 
-	// TODO create .polldot.json from cfg
-
-	logfile := os.Getenv("HOME") + "/polldot.log"
-	os.Remove(logfile)
-	os.Truncate(logfile, 0)
+	// (3) create a corresponding configuration file
+	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		log.Fatal(err)
+	}
+	err = ioutil.WriteFile("testdata/.polldot.json", data, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// (4) create an empty log file
+	logfile := os.Getenv("HOME") + "/polldot.log"
+	_, err = os.Create(logfile) // TODO what happens if the file was created before with the os.O_APPEND|os.O_WRONLY flags in initLog()? Truncating might give problems.
+	if err != nil {
+		log.Fatalf("%+v (%T)", err, err)
 	}
 
 }
@@ -48,7 +62,7 @@ func testCfg() *config.Config {
 		From:      "root@localhost",
 		To:        "root@localhost",
 		Subject:   "mail from polldot go test",
-		Body:      "test run at " + time.Now().String(),
+		Body:      "test run",
 		Host:      "127.0.0.1",
 		Port:      2525,
 		CycleLen:  10,
