@@ -18,6 +18,7 @@ import (
 )
 
 // initTest makes a clean test environment by:
+// (0) creating a directory 'testdata'
 // (1) setting the HOME environment variable to 'testdata'
 // (2) setting cfg to a sane test value where the testservers are
 // being used
@@ -25,6 +26,16 @@ import (
 // (4) create an empty log file
 // Test servers are started from init() in polldot_test.go.
 func initTest() {
+
+	// (0) creating a directory 'testdata'
+	err = os.RemoveAll("testdata")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = os.Mkdir("testdata", os.ModeDir|0755)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// (1) setting the HOME environment variable to 'testdata'
 	err = os.Setenv("HOME", "testdata")
@@ -47,8 +58,7 @@ func initTest() {
 	}
 
 	// (4) create an empty log file
-	logfile := os.Getenv("HOME") + "/polldot.log"
-	_, err = os.Create(logfile) // TODO what happens if the file was created before with the os.O_APPEND|os.O_WRONLY flags in initLog()? Truncating might give problems.
+	_, err = os.Create("testdata/polldot.log")
 	if err != nil {
 		log.Fatalf("%+v (%T)", err, err)
 	}

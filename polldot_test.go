@@ -26,6 +26,8 @@ func init() {
 	http.Handle("/empty", http.HandlerFunc(empty))
 	http.Handle("/flipping", http.HandlerFunc(flipping))
 
+	// give servers some time (TODO: use a more portable technique)
+	time.Sleep(time.Millisecond * 50)
 }
 
 func TestFetch(t *testing.T) {
