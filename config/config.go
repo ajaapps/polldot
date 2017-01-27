@@ -8,27 +8,33 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"time"
 )
 
 // Config contains all the fields from the configuration file.
 type Config struct {
-	URL       string        `json:"url"` // the file to retreive and check for '.'
-	From      string        `json:"from"`
-	To        string        `json:"to"`
-	Subject   string        `json:"subject"`
-	Body      string        `json:"body"`
-	Host      string        `json:"host"` // mailserver hostname
-	Port      int           `json:"port"` // mailserver port no
-	CycleLen  int           `json:"cycle_length"`
-	CycleUnit string        `json:"cycle_unit"` // "minutes" or "seconds"
-	Sleep     time.Duration // duration between fetch cycles; calculated value
+	URL string `json:"url"` // the file to retreive and check for '.'
+	mailCfg
+	CycleLen  int    `json:"cycle.length"`
+	CycleUnit string `json:"cycle.unit"` // "minutes" or "seconds"
+}
+
+// mailCfg contains configuration data for the mail to be sent
+type mailCfg struct {
+	From    string `json:"mail.from"`
+	To      string `json:"mail.to"`
+	Subject string `json:"mail.subject"`
+	Body    string `json:"mail.body"`
+	Host    string `json:"mail.host"` // mailserver hostname
+	Port    int    `json:"mail.port"` // mailserver port no
 }
 
 var (
-	cfg    *Config
-	minDur time.Duration = time.Second * 10 // lower limit on poll frequency
+	cfg      *Config
+	Sleep    time.Duration // duration between fetch cycles; calculated value
+	minSleep time.Duration = time.Second * 10
 )
 
 // Load loads the configuration from disk. If the configuration
@@ -60,8 +66,8 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// read reads the file and marshals it into cfg. It gives the
-// Sleep field its value.
+// read reads the file and marshals it into cfg. It also gives the
+// Sleep variable its value.
 func read() error {
 
 	// open file
@@ -82,8 +88,8 @@ func read() error {
 		return err
 	}
 
-	// calculate value for Sleep field
-	cfg.Sleep, err = calcSleep()
+	// calculate value for Sleep
+	Sleep, err = calcSleep()
 	if err != nil {
 		return err
 	}
@@ -93,21 +99,23 @@ func read() error {
 
 // defaults sets some sane default values for cfg
 func defaults() {
+	mailcfg := mailCfg{
+		From:    "from@some.host.net",
+		To:      "to@another.host.org",
+		Subject: "subject text",
+		Body:    "Contents\nof the mail body.\n",
+		Host:    "smtp.mailserver.org",
+		Port:    25,
+	}
 	cfg = &Config{
-		URL:       "http://www.example.net/path/dotfile",
-		From:      "from@some.host.net",
-		To:        "to@another.host.org",
-		Subject:   "subject text",
-		Body:      "Contents\nof the mail body.\n",
-		Host:      "smtp.mailserver.org",
-		Port:      25,
-		CycleLen:  10,
-		CycleUnit: "minutes",
-		Sleep:     time.Minute * 10,
+		"http://www.example.net/path/dotfile",
+		mailcfg,
+		10,
+		"minutes",
 	}
 }
 
-// calcSleep calculates the Sleep field using CycleLen and CycleUnit.
+// calcSleep calculates the Sleep variable using CycleLen and CycleUnit.
 // A minimum value is enforced.
 func calcSleep() (d time.Duration, e error) {
 
@@ -123,9 +131,10 @@ func calcSleep() (d time.Duration, e error) {
 		e = fmt.Errorf("wrong unit: %+v", cfg.CycleUnit)
 	}
 
-	if d < minDur {
+	if d < minSleep {
 		// conform to minimal duration between cycles
-		d = minDur
+		log.Println("[config] forcing Sleep to minimum", minSleep)
+		d = minSleep
 	}
 
 	return d, e

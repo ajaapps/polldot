@@ -158,12 +158,12 @@ func pollLoop() string {
 			cfgOld := cfg
 			err = initConfig()
 			if err != nil {
-				log.Printf("not using new config; %+v\n", err)
+				log.Printf("not using new config. %+v\n", err)
 				cfg = cfgOld
 			}
 			log.Printf("configuration: %+v\n", cfg)
 
-		case <-time.After(cfg.Sleep):
+		case <-time.After(config.Sleep):
 
 			err = fetch(cfg.URL)
 			if err != nil {
@@ -204,9 +204,10 @@ func main() {
 	go catchSignals()
 
 	// start the main fetch/mail loop
-	returnStr := pollLoop()
+	str := pollLoop()
+	str += "; EXIT."
 
-	log.Println(returnStr)
+	log.Println(str)
 	log.SetOutput(os.Stderr)
-	log.Println(returnStr)
+	log.Println(str)
 }

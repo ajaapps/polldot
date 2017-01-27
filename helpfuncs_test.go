@@ -45,7 +45,7 @@ func waitFor(addr string) error {
 }
 
 // initTest makes a clean test environment by:
-// (0) creating a directory 'testdata'
+// (0) creating an empty directory 'testdata'
 // (1) setting the HOME environment variable to 'testdata'
 // (2) setting cfg to a sane test value where the testservers are
 // being used
@@ -54,7 +54,7 @@ func waitFor(addr string) error {
 // Test servers are started from init() in polldot_test.go.
 func initTest() {
 
-	// (0) creating a directory 'testdata'
+	// (0)  (see func documentation)
 	err = os.RemoveAll("testdata")
 	if err != nil {
 		log.Fatal(err)
@@ -64,17 +64,16 @@ func initTest() {
 		log.Fatal(err)
 	}
 
-	// (1) setting the HOME environment variable to 'testdata'
+	// (1)
 	err = os.Setenv("HOME", "testdata")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// (2) setting cfg to a sane test value where the testservers are
-	// being used
+	// (2)
 	cfg = testCfg()
 
-	// (3) create a corresponding configuration file
+	// (3)
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		log.Fatal(err)
@@ -84,7 +83,7 @@ func initTest() {
 		log.Fatal(err)
 	}
 
-	// (4) create an empty log file
+	// (4)
 	_, err = os.Create("testdata/polldot.log")
 	if err != nil {
 		log.Fatalf("%+v (%T)", err, err)
@@ -94,18 +93,17 @@ func initTest() {
 
 // testCfg returns a complete cfg variable with testing values
 func testCfg() *config.Config {
-	return &config.Config{
-		URL:       "http://127.0.0.1:8080/valid",
-		From:      "root@localhost",
-		To:        "root@localhost",
-		Subject:   "mail from polldot go test",
-		Body:      "test run",
-		Host:      "127.0.0.1",
-		Port:      2525,
-		CycleLen:  10,
-		CycleUnit: "seconds",
-		Sleep:     time.Second * 10,
-	}
+	c := new(config.Config)
+	c.URL = "http://127.0.0.1:8080/valid"
+	c.From = "root@localhost"
+	c.To = "root@localhost"
+	c.Subject = "mail from polldot go test"
+	c.Body = "test run"
+	c.Host = "127.0.0.1"
+	c.Port = 2525
+	c.CycleLen = 10
+	c.CycleUnit = "seconds"
+	return c
 }
 
 // handler functions for http.Handle()

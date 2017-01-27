@@ -128,7 +128,7 @@ func TestMail(t *testing.T) {
 	// non-mail server on port
 	t.Run("timeout", func(t *testing.T) {
 		if testing.Short() {
-			t.Skip("skipping timeout test")
+			t.SkipNow()
 		}
 		c = testCfg()
 		c.Port = 8080
@@ -272,15 +272,7 @@ func TestPollLoop(t *testing.T) {
 	t.Run("after", func(t *testing.T) {
 		// succesful fetch -> mail sent
 		cfg = testCfg()
-		cfg.Sleep = time.Millisecond * 100
-		/*
-			var ret string
-			wait := cfg.Sleep * 10
-			go func() {
-				ret = pollLoop()
-			}()
-			time.Sleep(wait) // TODO
-		*/
+		config.Sleep = time.Millisecond * 100
 		var ret string = ""
 		returned := make(chan string, 1)
 		go func() { returned <- pollLoop() }()
@@ -310,11 +302,12 @@ func TestMain(t *testing.T) { //TODO
 	// note: see use of cmd.Process.Kill() in net/http/serve_test.go:
 	// this way we can use / test wait also.
 
-	configfile := os.Getenv("HOME") + "/.polldot.json"
-	os.Remove(configfile)
-	defer os.Remove(configfile)
-	logfile := os.Getenv("HOME") + "/polldot.log"
-	os.Remove(logfile)
-	// main()
-
+	/*
+		configfile := os.Getenv("HOME") + "/.polldot.json"
+		os.Remove(configfile)
+		defer os.Remove(configfile)
+		logfile := os.Getenv("HOME") + "/polldot.log"
+		os.Remove(logfile)
+		main()
+	*/
 }
