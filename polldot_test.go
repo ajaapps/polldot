@@ -154,7 +154,7 @@ func TestInitLog(t *testing.T) {
 		}
 
 		str := "testline from polldot_test.go"
-		log.Println(str)
+		flog.Println(str)
 		content, _ := ioutil.ReadFile(logfile)
 		prefixLen := len(fmt.Sprintf("[%d] ", os.Getpid())) + 20 // prefix is like "[21308] 2017/01/19 15:23:05 "
 		str2 := string(content[prefixLen : prefixLen+len(str)])  // strip prefix and newline
@@ -281,8 +281,8 @@ func TestPollLoop(t *testing.T) {
 		case <-time.After(mailTimeout + time.Second):
 			ret = "pollLoop timed out"
 		}
-		if ret != "mail sent" {
-			t.Errorf("Expected 'mail sent', got '%s'", ret)
+		if ret != "mail sent." {
+			t.Errorf("Expected 'mail sent.', got '%s'", ret)
 		}
 
 	})

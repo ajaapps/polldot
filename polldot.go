@@ -44,6 +44,7 @@ var (
 	quit        chan int      = make(chan int, 1)
 	reload      chan int      = make(chan int, 1)
 	mailTimeout time.Duration = time.Second * 5
+	flog        *log.Logger
 )
 
 // fetch gets the file and checks its contents
@@ -108,8 +109,8 @@ func initLog() error {
 		return err
 	}
 
-	log.SetOutput(io.Writer(fd))
-	log.SetPrefix(fmt.Sprintf("[%d] ", os.Getpid()))
+	prefix := fmt.Sprintf("[%d] ", os.Getpid())
+	flog = log.New(io.Writer(fd), prefix, log.LstdFlags)
 
 	return nil
 }
@@ -132,10 +133,10 @@ func catchSignals() {
 		syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1,
 	)
 
-	log.Println("waiting for signals ...")
+	flog.Println("waiting for signals ...")
 
 	for sig := range signals {
-		log.Printf("received signal: %+v\n", sig)
+		flog.Printf("received signal: %+v\n", sig)
 		switch sig {
 		case syscall.SIGHUP:
 			reload <- 1
@@ -158,23 +159,23 @@ func pollLoop() string {
 			cfgOld := cfg
 			err = initConfig()
 			if err != nil {
-				log.Printf("not using new config. %+v\n", err)
+				flog.Printf("not using new config. %+v\n", err)
 				cfg = cfgOld
 			}
-			log.Printf("configuration: %+v\n", cfg)
+			flog.Printf("configuration: %+v\n", cfg)
 
 		case <-time.After(config.Sleep):
 
 			err = fetch(cfg.URL)
 			if err != nil {
-				log.Println(err)
+				flog.Println(err)
 				continue // retry again later
 			}
 			err = mail(cfg)
 			if err != nil {
 				return err.Error()
 			}
-			return "mail sent"
+			return "mail sent."
 		}
 	}
 }
@@ -184,30 +185,25 @@ func main() {
 	// initialize logging
 	err = initLog()
 	if err != nil {
-		log.Println(err)
-		log.SetOutput(os.Stderr)
 		log.Fatal(err)
 	}
-	log.Println("")
-	log.Println("polldot started")
+	flog.Println("")
+	flog.Println("polldot started")
 
 	// initialize configuration
 	err = initConfig()
 	if err != nil {
-		log.Println(err)
-		log.SetOutput(os.Stderr)
+		flog.Println(err)
 		log.Fatal(err)
 	}
-	log.Printf("configuration: %+v\n", cfg)
+	flog.Printf("configuration: %+v\n", cfg)
 
 	// start signal handler
 	go catchSignals()
 
 	// start the main fetch/mail loop
 	str := pollLoop()
-	str += "; EXIT."
 
-	log.Println(str)
-	log.SetOutput(os.Stderr)
+	flog.Println(str)
 	log.Println(str)
 }
