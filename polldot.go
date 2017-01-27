@@ -136,7 +136,7 @@ func catchSignals() {
 	flog.Println("waiting for signals ...")
 
 	for sig := range signals {
-		flog.Printf("received signal: %+v\n", sig)
+		flog.Printf("received signal: %+v", sig)
 		switch sig {
 		case syscall.SIGHUP:
 			reload <- 1
@@ -159,10 +159,10 @@ func pollLoop() string {
 			cfgOld := cfg
 			err = initConfig()
 			if err != nil {
-				flog.Printf("not using new config. %+v\n", err)
+				flog.Printf("not using new config. %+v", err)
 				cfg = cfgOld
 			}
-			flog.Printf("configuration: %+v\n", cfg)
+			flog.Printf("configuration: %+v", cfg)
 
 		case <-time.After(config.Sleep):
 
@@ -196,7 +196,7 @@ func main() {
 		flog.Println(err)
 		log.Fatal(err)
 	}
-	flog.Printf("configuration: %+v\n", cfg)
+	flog.Printf("configuration: %+v", cfg)
 
 	// start signal handler
 	go catchSignals()

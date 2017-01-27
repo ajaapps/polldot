@@ -197,7 +197,7 @@ func TestInitConfig(t *testing.T) {
 
 		err := initConfig()
 
-		expected := "edit config file and retry"
+		expected := "edit config file and restart"
 		if err != nil {
 			if err.Error() != expected {
 				t.Errorf("expecting '%s' error, got '%s'", expected, err)

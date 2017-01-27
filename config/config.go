@@ -55,7 +55,7 @@ func Load() (*Config, error) {
 			if err != nil {
 				return nil, err
 			}
-			return cfg, fmt.Errorf("%s", "edit config file and retry")
+			return cfg, fmt.Errorf("%s", "edit config file and restart")
 
 		default:
 			return nil, err
