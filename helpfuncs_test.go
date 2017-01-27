@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -16,6 +17,32 @@ import (
 
 	"github.com/ajaapps/polldot/config"
 )
+
+// waitFor waits for a tcp server to be connectable. If it takes
+// longer then a full second to get a connection, a timeout error is
+// returned.
+func waitFor(addr string) error {
+
+	tempDelay := 1 * time.Nanosecond
+	timeout := 1 * time.Second
+
+	for { // loop until a connection is accepted
+
+		c, err := net.Dial("tcp", addr)
+		if err == nil {
+			c.Close()
+			return nil
+		}
+
+		if tempDelay > timeout/2 {
+			return fmt.Errorf("timeout exceeded (%+v).", timeout)
+		}
+
+		tempDelay *= 2
+		time.Sleep(tempDelay)
+
+	}
+}
 
 // initTest makes a clean test environment by:
 // (0) creating a directory 'testdata'
@@ -123,21 +150,21 @@ func testFatal(envvar string, f func(), regexp string, t *testing.T) {
 	t.Errorf("process ran with err %v, want exit status 1", err)
 }
 
-// mailServer is a stub smtp server for testing.
-// Honoustly stolen from smtp_test.go
-func mailServer(addr string) {
+// fakeSMTP is a stub smtp server for testing.  Honoustly stolen from
+// smtp_test.go
+func fakeSMTP(addr string) {
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatal("Unable to to create listener: %v", err)
+		log.Fatal("fakeSMTP unable to to create listener. %v", err)
 	}
 	defer l.Close()
 
 	for {
 		conn, err := l.Accept()
-		//log.Println(" *****     new conn *****") //TODO remove
+		// log.Println(" ****  new conn ****", conn.LocalAddr().String(), conn.RemoteAddr().String()) //TODO remove
 		if err != nil {
-			log.Fatal("Accept error: %v", err)
+			log.Fatal("fakeSMTP Accept error. %v", err)
 		}
 		handleOne(conn)
 		//log.Println(" ***** closing conn *****") //TODO remove
@@ -152,7 +179,6 @@ func handleOne(c net.Conn) {
 	for i := 0; i < len(serverChat); i++ {
 
 		tc.PrintfLine(serverChat[i])
-		//log.Println("S", i, serverChat[i])
 
 		if serverChat[i] == "221 Goodbye" {
 			return
@@ -163,19 +189,22 @@ func handleOne(c net.Conn) {
 		if serverChat[i] == "354 Go ahead" {
 			// read body
 			for {
-				msg, _ = tc.ReadLine() // TODO err handling
-				//		log.Println("C  ", msg)
+				msg, err = tc.ReadLine()
+				if err != nil {
+					return // TODO return error
+				}
 				if msg == "." {
 					i = 6
 					tc.PrintfLine(serverChat[i])
-					//log.Println("S", i, serverChat[i])
 					break
 				}
 			}
 		}
 
-		msg, _ = tc.ReadLine() // TODO err handling
-		//log.Println("C  ", msg)
+		msg, _ = tc.ReadLine()
+		if err != nil {
+			return // TODO return error
+		}
 
 		if strings.Contains(msg, "QUIT") {
 			i = 6

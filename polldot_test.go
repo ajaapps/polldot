@@ -16,8 +16,15 @@ import (
 )
 
 func init() {
+
 	// fake mail server for testing
-	go mailServer("127.0.0.1:2525")
+	go fakeSMTP("127.0.0.1:2525")
+
+	err = waitFor("127.0.0.1:2525")
+	if err != nil {
+		log.Println("init() can not dial fake mailserver.", err)
+		os.Exit(1)
+	}
 
 	// web server for testing
 	go http.ListenAndServe("127.0.0.1:8080", nil)
@@ -26,8 +33,12 @@ func init() {
 	http.Handle("/empty", http.HandlerFunc(empty))
 	http.Handle("/flipping", http.HandlerFunc(flipping))
 
-	// give servers some time (TODO: use a more portable technique)
-	time.Sleep(time.Millisecond * 50)
+	err = waitFor("127.0.0.1:8080")
+	if err != nil {
+		log.Println("init() can not dial test web server.", err)
+		os.Exit(1)
+	}
+
 }
 
 func TestFetch(t *testing.T) {
@@ -289,12 +300,15 @@ func TestMain(t *testing.T) { //TODO
 	// TODO use initTest()
 	// start een mail- en webserver en verzorg config file
 	//  start het programma met cmd.Run(...)
-	// beeindig het door de file te serveren
+	// beeindig het door() de file te serveren
 	// check contents of logfile
 	// check de mail
 
 	// maybe move TestFetch/flipping here
 	// maybe move most of TestPollLoop here
+
+	// note: see use of cmd.Process.Kill() in net/http/serve_test.go:
+	// this way we can use / test wait also.
 
 	configfile := os.Getenv("HOME") + "/.polldot.json"
 	os.Remove(configfile)
