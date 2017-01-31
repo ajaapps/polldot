@@ -51,7 +51,8 @@ func waitFor(addr string) error {
 // being used
 // (3) create a corresponding configuration file
 // (4) create an empty log file
-// Test servers are started from init() in polldot_test.go.
+// (5) makes flog a *log.Logger to that file
+// The test servers are started from init() in polldot_test.go.
 func initTest() {
 
 	// (0)  (see func documentation)
@@ -86,9 +87,15 @@ func initTest() {
 	// (4)
 	_, err = os.Create("testdata/polldot.log")
 	if err != nil {
-		log.Fatalf("%+v (%T)", err, err)
+		log.Fatal(err)
 	}
 
+	// (5)
+	fd, err := os.OpenFile("testdata/polldot.log", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	flog = log.New(io.Writer(fd), "TEST ", log.Lshortfile)
 }
 
 // testCfg returns a complete cfg variable with testing values
@@ -103,6 +110,7 @@ func testCfg() *config.Config {
 	c.Port = 2525
 	c.CycleLen = 10
 	c.CycleUnit = "seconds"
+	config.Sleep = time.Second * 10
 	return c
 }
 
@@ -134,52 +142,59 @@ func flipping(w http.ResponseWriter, req *http.Request) {
 // environment variable.
 // This way of testing functions ending in exit(1) is found here:
 // http://stackoverflow.com/questions/30688554/how-to-test-go-function-containing-log-fatal
-func testFatal(envvar string, f func(), regexp string, t *testing.T) {
+func testNonreturner(envvar string, f func(), regexp string, t *testing.T) {
 	if os.Getenv(envvar) == "1" {
+		initTest()
 		f()
-		return
 	}
 	cmd := exec.Command(os.Args[0], "-test.run="+regexp)
 	cmd.Env = append(os.Environ(), envvar+"=1")
 	err = cmd.Run()
+	/*TODO parm for exit > 0
 	if e, ok := err.(*exec.ExitError); ok && !e.Success() {
 		return
 	}
 	t.Errorf("process ran with err %v, want exit status 1", err)
+	*/
+	if err != nil {
+		t.Errorf("process ran with err %v, want <nil>", err)
+	}
+
 }
 
 // fakeSMTP is a stub smtp server for testing.  Honoustly stolen from
 // smtp_test.go
-func fakeSMTP(addr string) {
+func fakeSMTP(addr string) error {
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		log.Fatal("fakeSMTP unable to to create listener. %v", err)
+		return err
 	}
 	defer l.Close()
 
 	for {
 		conn, err := l.Accept()
-		// log.Println(" ****  new conn ****", conn.LocalAddr().String(), conn.RemoteAddr().String()) //TODO remove
 		if err != nil {
-			log.Fatal("fakeSMTP Accept error. %v", err)
+			return err
 		}
-		handleOne(conn)
-		//log.Println(" ***** closing conn *****") //TODO remove
+		err = handleOne(conn)
+		if err != nil {
+			// i don't care
+		}
+
 		conn.Close()
 	}
 }
 
-func handleOne(c net.Conn) {
+func handleOne(c net.Conn) error {
 
 	tc := textproto.NewConn(c)
 
 	for i := 0; i < len(serverChat); i++ {
 
 		tc.PrintfLine(serverChat[i])
-
 		if serverChat[i] == "221 Goodbye" {
-			return
+			return nil
 		}
 
 		var msg string
@@ -189,7 +204,7 @@ func handleOne(c net.Conn) {
 			for {
 				msg, err = tc.ReadLine()
 				if err != nil {
-					return // TODO return error
+					return err
 				}
 				if msg == "." {
 					i = 6
@@ -199,15 +214,17 @@ func handleOne(c net.Conn) {
 			}
 		}
 
-		msg, _ = tc.ReadLine()
+		msg, err = tc.ReadLine()
 		if err != nil {
-			return // TODO return error
+			return err
 		}
 
 		if strings.Contains(msg, "QUIT") {
 			i = 6
 		}
 	}
+
+	return nil
 }
 
 var serverChat = [8]string{

@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,13 +18,18 @@ import (
 
 func init() {
 
+	if os.Getenv("TESTMAIN") != "" {
+		// see TestMain(): this is a child process; servers are
+		// already up
+		return
+	}
+
 	// fake mail server for testing
 	go fakeSMTP("127.0.0.1:2525")
 
 	err = waitFor("127.0.0.1:2525")
 	if err != nil {
-		log.Println("init() can not dial fake mailserver.", err)
-		os.Exit(1)
+		log.Fatalf("init() can not dial fake mailserver.", err)
 	}
 
 	// web server for testing
@@ -35,8 +41,7 @@ func init() {
 
 	err = waitFor("127.0.0.1:8080")
 	if err != nil {
-		log.Println("init() can not dial test web server.", err)
-		os.Exit(1)
+		log.Fatalf("init() can not dial test web server.", err)
 	}
 
 }
@@ -99,6 +104,7 @@ func TestMail(t *testing.T) {
 	// valid email
 	t.Run("valid", func(t *testing.T) {
 		c = testCfg()
+
 		err = mail(c)
 		if err != nil {
 			t.Errorf("expecting <nil>, got %+v", err)
@@ -109,6 +115,7 @@ func TestMail(t *testing.T) {
 	t.Run("recip", func(t *testing.T) {
 		c = testCfg()
 		c.To = "bad!re$ip ient"
+
 		err = mail(c)
 		if err == nil || !strings.Contains(err.Error(), "invalid address") {
 			t.Errorf("expecting 'invalid address', got '%+v'", err)
@@ -119,6 +126,7 @@ func TestMail(t *testing.T) {
 	t.Run("noconn", func(t *testing.T) {
 		c = testCfg()
 		c.Port = 65432 // asuming no server is running on this port
+
 		err = mail(c)
 		if _, ok := err.(*net.OpError); !ok {
 			t.Errorf("expecting *net.OpError error, got %T", err)
@@ -132,6 +140,7 @@ func TestMail(t *testing.T) {
 		}
 		c = testCfg()
 		c.Port = 8080
+
 		err = mail(c)
 		if err == nil || !strings.Contains(err.Error(), "mail timeout: ") {
 			t.Errorf("expecting 'mail timeout: ', got '%+v'", err)
@@ -140,6 +149,8 @@ func TestMail(t *testing.T) {
 
 }
 
+/*
+ */
 func TestInitLog(t *testing.T) {
 
 	// OpenFile succeeds -> log lines in file with [pid]
@@ -197,13 +208,8 @@ func TestInitConfig(t *testing.T) {
 
 		err := initConfig()
 
-		expected := "edit config file and restart"
-		if err != nil {
-			if err.Error() != expected {
-				t.Errorf("expecting '%s' error, got '%s'", expected, err)
-			}
-		} else {
-			t.Errorf("expecting '%s' error, got <nil>", expected)
+		if _, ok := err.(config.ErrVanilla); !ok {
+			t.Errorf("expecting error type 'ErrVanilla', got %T", err)
 		}
 
 	})
@@ -228,13 +234,9 @@ func TestInitConfig(t *testing.T) {
 }
 
 func TestPollLoop(t *testing.T) {
-	// TODO use initTest()
-
-	initLog()    // to not have too much output in tests
-	initConfig() // to have an existing config file
-	cfg = testCfg()
 
 	t.Run("quit", func(t *testing.T) {
+		initTest()
 		go func() {
 			quit <- 1
 		}()
@@ -247,6 +249,7 @@ func TestPollLoop(t *testing.T) {
 	t.Run("reload", func(t *testing.T) {
 
 		t.Run("ok", func(t *testing.T) {
+			initTest()
 			cfg.URL = "SOME STRANGE STRING"
 			go func() { reload <- 1 }()
 			go pollLoop()
@@ -257,6 +260,7 @@ func TestPollLoop(t *testing.T) {
 		})
 
 		t.Run("nok", func(t *testing.T) {
+			initTest()
 			os.Remove(os.Getenv("HOME") + "/.polldot.json")
 			cfg.URL = "SOME STRANGE STRING"
 			go func() { reload <- 1 }()
@@ -269,45 +273,51 @@ func TestPollLoop(t *testing.T) {
 
 	})
 
+	// succesful fetch -> mail sent
 	t.Run("after", func(t *testing.T) {
-		// succesful fetch -> mail sent
-		cfg = testCfg()
+		initTest()
 		config.Sleep = time.Millisecond * 100
-		var ret string = ""
-		returned := make(chan string, 1)
-		go func() { returned <- pollLoop() }()
+		ch := make(chan string, 1)
+		str := ""
+
+		go func() { ch <- pollLoop() }()
+
 		select {
-		case ret = <-returned:
+		case str = <-ch:
 		case <-time.After(mailTimeout + time.Second):
-			ret = "pollLoop timed out"
+			str = "pollLoop timed out"
 		}
-		if ret != "mail sent." {
-			t.Errorf("Expected 'mail sent.', got '%s'", ret)
+
+		if str != "mail sent." {
+			t.Errorf("Expected 'mail sent.', got '%s'", str)
 		}
 
 	})
 }
 
-func TestMain(t *testing.T) { //TODO
-	// TODO use initTest()
-	// start een mail- en webserver en verzorg config file
-	//  start het programma met cmd.Run(...)
-	// beeindig het door() de file te serveren
-	// check contents of logfile
-	// check de mail
+/*
+ */
 
-	// maybe move TestFetch/flipping here
-	// maybe move most of TestPollLoop here
-
+func TestMain(t *testing.T) { //TODO answer why it does not give extra coverage, while none zero percentages are given.
 	// note: see use of cmd.Process.Kill() in net/http/serve_test.go:
 	// this way we can use / test wait also.
-
-	/*
-		configfile := os.Getenv("HOME") + "/.polldot.json"
-		os.Remove(configfile)
-		defer os.Remove(configfile)
-		logfile := os.Getenv("HOME") + "/polldot.log"
-		os.Remove(logfile)
+	if os.Getenv("TESTMAIN") == "1" {
+		initTest()
 		main()
-	*/
+		return
+	}
+	cmd := exec.Command(os.Args[0], "-test.run=TestMain")
+	cmd.Env = append(os.Environ(), "TESTMAIN=1")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		t.Errorf("process ran with err %v, want <nil>", err)
+	}
+
+	//t.Run("normal", func(t *testing.T) {
+	//})
 }
+
+/*
+ */

@@ -5,13 +5,29 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"time"
 )
+
+// ErrVanilla is returned when no configurationfile is found and a new
+// file is written. The content of the file corresponds to the value
+// of the cfg variable just after defaults().
+type ErrVanilla struct {
+	path string
+	error
+}
+
+func (e ErrVanilla) Error() string {
+	return "new Vanilla configuration file created. Please edit this file: " + e.path
+}
+
+var ErrHomeless = errors.New("HOME must be set")
+var ErrUnit = errors.New("CycleUnit must be 'seconds' or 'minutes'")
+var ErrMinsleep = errors.New("config.Sleep must not be less then " + minSleep.String())
 
 // Config contains all the fields from the configuration file.
 type Config struct {
@@ -37,6 +53,14 @@ var (
 	minSleep time.Duration = time.Second * 10
 )
 
+func cfgFilename() string {
+	home := os.Getenv("HOME")
+	if home == "" {
+		log.Fatal(ErrHomeless)
+	}
+	return home + "/.polldot.json"
+}
+
 // Load loads the configuration from disk. If the configuration
 // file is not found, a default configuration is used and written
 // to disk.
@@ -55,7 +79,7 @@ func Load() (*Config, error) {
 			if err != nil {
 				return nil, err
 			}
-			return cfg, fmt.Errorf("%s", "edit config file and restart")
+			return cfg, ErrVanilla{path: cfgFilename()}
 
 		default:
 			return nil, err
@@ -71,11 +95,7 @@ func Load() (*Config, error) {
 func read() error {
 
 	// open file
-	home := os.Getenv("HOME")
-	if home == "" {
-		return fmt.Errorf("HOME must be set")
-	}
-	fd, err := os.Open(home + "/.polldot.json")
+	fd, err := os.Open(cfgFilename())
 	if err != nil {
 		return err
 	}
@@ -116,7 +136,7 @@ func defaults() {
 }
 
 // calcSleep calculates the Sleep variable using CycleLen and CycleUnit.
-// A minimum value is enforced.
+// If Sleep is too small, the function returns an ErrMinsleep error.
 func calcSleep() (d time.Duration, e error) {
 
 	switch cfg.CycleUnit {
@@ -128,13 +148,12 @@ func calcSleep() (d time.Duration, e error) {
 		e = nil
 	default:
 		d = time.Hour * 24 * 365 // some 'random' very long duration
-		e = fmt.Errorf("wrong unit: %+v", cfg.CycleUnit)
+		e = ErrUnit
 	}
 
 	if d < minSleep {
-		// conform to minimal duration between cycles
-		log.Println("[config] forcing Sleep to minimum", minSleep)
-		d = minSleep
+		d = time.Hour * 24 * 365 // some 'random' very long duration
+		e = ErrMinsleep
 	}
 
 	return d, e
@@ -147,10 +166,5 @@ func write() error {
 		return err
 	}
 
-	home := os.Getenv("HOME")
-	if home == "" {
-		return fmt.Errorf("homedirectory not in environment")
-	}
-
-	return ioutil.WriteFile(home+"/.polldot.json", data, 0644)
+	return ioutil.WriteFile(cfgFilename(), data, 0644)
 }

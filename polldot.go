@@ -148,6 +148,7 @@ func catchSignals() {
 
 // pollLoop is the main fetch/main loop of the program.
 func pollLoop() string {
+
 	for {
 		select {
 
@@ -162,7 +163,7 @@ func pollLoop() string {
 				flog.Printf("not using new config. %+v", err)
 				cfg = cfgOld
 			}
-			flog.Printf("configuration: %+v", cfg)
+			flog.Printf("using configuration: %+v", cfg)
 
 		case <-time.After(config.Sleep):
 
@@ -171,6 +172,7 @@ func pollLoop() string {
 				flog.Println(err)
 				continue // retry again later
 			}
+			flog.Println("fetch() succes")
 			err = mail(cfg)
 			if err != nil {
 				return err.Error()
@@ -196,7 +198,7 @@ func main() {
 		flog.Println(err)
 		log.Fatal(err)
 	}
-	flog.Printf("configuration: %+v", cfg)
+	flog.Printf("using configuration: %+v", cfg)
 
 	// start signal handler
 	go catchSignals()
