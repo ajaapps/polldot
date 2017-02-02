@@ -109,8 +109,6 @@ func testCfg() *config.Config {
 	c.Body = "test run"
 	c.Host = "127.0.0.1"
 	c.Port = 2525
-	c.CycleLen = 10
-	c.CycleUnit = "seconds"
 	return c
 }
 

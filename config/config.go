@@ -30,8 +30,6 @@ var ErrHomeless = errors.New("HOME must be set")
 type Config struct {
 	URL string `json:"url"` // the file to retreive and check for '.'
 	mailCfg
-	CycleLen  int    `json:"cycle.length"`
-	CycleUnit string `json:"cycle.unit"` // "minutes" or "seconds"
 }
 
 // mailCfg contains configuration data for the mail to be sent
@@ -118,8 +116,6 @@ func defaults() {
 	cfg = &Config{
 		"http://www.example.net/path/dotfile",
 		mailcfg,
-		10,
-		"minutes",
 	}
 }
 

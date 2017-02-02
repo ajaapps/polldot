@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -305,26 +304,9 @@ func TestMain(t *testing.T) {
 
 	//t.Run("normal", func(t *testing.T) {
 	//})
-	if testing.Short() {
-		t.SkipNow()
-	}
 	if os.Getenv("TESTMAIN") == "1" {
-
 		initTest()
-
-		// redo configfile for shorter waits while testing
-		cfg.CycleLen = 1
-		cfg.CycleUnit = "seconds"
-		data, err := json.MarshalIndent(cfg, "", "  ")
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = ioutil.WriteFile("testdata/.polldot.json", data, 0644)
-		if err != nil {
-			log.Fatal(err)
-		}
-		minSleep = time.Second
-
+		sleep = time.Millisecond
 		main()
 		return
 	}
