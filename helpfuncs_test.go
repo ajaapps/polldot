@@ -73,7 +73,7 @@ func initTest() {
 
 	// (2)
 	cfg = testCfg()
-	sleep = time.Second * 10
+	*sleep = time.Second * 10
 
 	// (3)
 	data, err := json.MarshalIndent(cfg, "", "  ")

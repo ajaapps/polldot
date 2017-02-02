@@ -24,6 +24,7 @@ things has happened:
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -38,7 +39,7 @@ import (
 )
 
 var (
-	sleep       time.Duration = time.Minute * 10 // duration between fetch cycles
+	sleep       = flag.Duration("sleep", time.Minute*10, "duration between fetch cycles")
 	err         error
 	cfg         *config.Config
 	mailerr     chan error    = make(chan error, 1)
@@ -169,7 +170,7 @@ func pollLoop() string {
 			}
 			flog.Printf("using configuration: %+v", cfg)
 
-		case <-time.After(sleep):
+		case <-time.After(*sleep):
 
 			err = fetch(cfg.URL)
 			if err != nil {
@@ -187,6 +188,7 @@ func pollLoop() string {
 }
 
 func main() {
+	flag.Parse()
 
 	// initialize logging
 	err = initLog()

@@ -276,7 +276,7 @@ func TestPollLoop(t *testing.T) {
 	// succesful fetch -> mail sent
 	t.Run("after", func(t *testing.T) {
 		initTest()
-		sleep = time.Millisecond * 100
+		*sleep = time.Millisecond * 100
 		ch := make(chan string, 1)
 		str := ""
 
@@ -302,23 +302,25 @@ func TestMain(t *testing.T) {
 	// note: see use of cmd.Process.Kill() in net/http/serve_test.go:
 	// this way we can use / test wait also.
 
-	//t.Run("normal", func(t *testing.T) {
-	//})
-	if os.Getenv("TESTMAIN") == "1" {
-		initTest()
-		sleep = time.Millisecond
-		main()
-		return
-	}
-	cmd := exec.Command(os.Args[0], "-test.run=TestMain")
-	cmd.Env = append(os.Environ(), "TESTMAIN=1")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
-	if err != nil {
-		t.Errorf("process ran with err %v, want <nil>", err)
-	}
+	t.Run("normal", func(t *testing.T) {
+		if os.Getenv("TESTMAIN") == "1" {
+			initTest()
+			*sleep = time.Millisecond
+			main()
+			return
+		}
+		cmd := exec.Command(os.Args[0], "-test.run=TestMain")
+		cmd.Env = append(os.Environ(), "TESTMAIN=1")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Run()
+		if err != nil {
+			t.Errorf("process ran with err %v, want <nil>", err)
+		}
+	})
 
+	t.Run("flagTODO", func(t *testing.T) {
+	})
 }
 
 /*
