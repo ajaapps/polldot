@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -276,7 +277,7 @@ func TestPollLoop(t *testing.T) {
 	// succesful fetch -> mail sent
 	t.Run("after", func(t *testing.T) {
 		initTest()
-		config.Sleep = time.Millisecond * 100
+		sleep = time.Millisecond * 100
 		ch := make(chan string, 1)
 		str := ""
 
@@ -298,11 +299,32 @@ func TestPollLoop(t *testing.T) {
 /*
  */
 
-func TestMain(t *testing.T) { //TODO answer why it does not give extra coverage, while none zero percentages are given.
+func TestMain(t *testing.T) {
 	// note: see use of cmd.Process.Kill() in net/http/serve_test.go:
 	// this way we can use / test wait also.
+
+	//t.Run("normal", func(t *testing.T) {
+	//})
+	if testing.Short() {
+		t.SkipNow()
+	}
 	if os.Getenv("TESTMAIN") == "1" {
+
 		initTest()
+
+		// redo configfile for shorter waits while testing
+		cfg.CycleLen = 1
+		cfg.CycleUnit = "seconds"
+		data, err := json.MarshalIndent(cfg, "", "  ")
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = ioutil.WriteFile("testdata/.polldot.json", data, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		minSleep = time.Second
+
 		main()
 		return
 	}
@@ -315,8 +337,6 @@ func TestMain(t *testing.T) { //TODO answer why it does not give extra coverage,
 		t.Errorf("process ran with err %v, want <nil>", err)
 	}
 
-	//t.Run("normal", func(t *testing.T) {
-	//})
 }
 
 /*

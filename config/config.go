@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"time"
 )
 
 // ErrVanilla is returned when no configurationfile is found and a new
@@ -26,8 +25,6 @@ func (e ErrVanilla) Error() string {
 }
 
 var ErrHomeless = errors.New("HOME must be set")
-var ErrUnit = errors.New("CycleUnit must be 'seconds' or 'minutes'")
-var ErrMinsleep = errors.New("config.Sleep must not be less then " + minSleep.String())
 
 // Config contains all the fields from the configuration file.
 type Config struct {
@@ -48,9 +45,7 @@ type mailCfg struct {
 }
 
 var (
-	cfg      *Config
-	Sleep    time.Duration // duration between fetch cycles; calculated value
-	minSleep time.Duration = time.Second * 10
+	cfg *Config
 )
 
 func cfgFilename() string {
@@ -90,8 +85,7 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// read reads the file and marshals it into cfg. It also gives the
-// Sleep variable its value.
+// read reads the file and marshals it into the cfg variable.
 func read() error {
 
 	// open file
@@ -104,12 +98,6 @@ func read() error {
 	// marshal file contents into a configuration
 	r := io.Reader(fd)
 	err = json.NewDecoder(r).Decode(cfg)
-	if err != nil {
-		return err
-	}
-
-	// calculate value for Sleep
-	Sleep, err = calcSleep()
 	if err != nil {
 		return err
 	}
@@ -133,30 +121,6 @@ func defaults() {
 		10,
 		"minutes",
 	}
-}
-
-// calcSleep calculates the Sleep variable using CycleLen and CycleUnit.
-// If Sleep is too small, the function returns an ErrMinsleep error.
-func calcSleep() (d time.Duration, e error) {
-
-	switch cfg.CycleUnit {
-	case "seconds":
-		d = time.Second * time.Duration(cfg.CycleLen)
-		e = nil
-	case "minutes":
-		d = time.Minute * time.Duration(cfg.CycleLen)
-		e = nil
-	default:
-		d = time.Hour * 24 * 365 // some 'random' very long duration
-		e = ErrUnit
-	}
-
-	if d < minSleep {
-		d = time.Hour * 24 * 365 // some 'random' very long duration
-		e = ErrMinsleep
-	}
-
-	return d, e
 }
 
 // write writes cfg in json encoded format to the file

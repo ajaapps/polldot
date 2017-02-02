@@ -24,6 +24,7 @@ things has happened:
 package main
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -38,6 +39,10 @@ import (
 )
 
 var (
+	errUnit     = errors.New("CycleUnit must be 'seconds' or 'minutes'")
+	errMinsleep = errors.New("Sleep must not be less then " + minSleep.String())
+	sleep       time.Duration // duration between fetch cycles; calculated value
+	minSleep    time.Duration = time.Second * 10
 	err         error
 	cfg         *config.Config
 	mailerr     chan error    = make(chan error, 1)
@@ -101,6 +106,30 @@ func mailWait(timeout time.Duration) error {
 	}
 }
 
+// calcSleep calculates the Sleep variable using CycleLen and CycleUnit.
+// If Sleep is too small, the function returns an ErrMinsleep error.
+func calcSleep() (d time.Duration, e error) {
+
+	switch cfg.CycleUnit {
+	case "seconds":
+		d = time.Second * time.Duration(cfg.CycleLen)
+		e = nil
+	case "minutes":
+		d = time.Minute * time.Duration(cfg.CycleLen)
+		e = nil
+	default:
+		d = time.Hour * 24 * 365 // some 'random' very long duration
+		e = errUnit
+	}
+
+	if d < minSleep {
+		d = time.Hour * 24 * 365 // some 'random' very long duration
+		e = errMinsleep
+	}
+
+	return d, e
+}
+
 // initLog configures log to use a logfile and a prefix
 func initLog() error {
 	filename := os.Getenv("HOME") + "/polldot.log"
@@ -118,7 +147,14 @@ func initLog() error {
 // initConfig fills the cfg variable
 func initConfig() error {
 	cfg, err = config.Load()
-	return err
+	if err != nil {
+		return err
+	}
+	sleep, err = calcSleep()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // catchSignals catches signals SIGHUP, SIGINT, SIGTERM and SIGUSR1.
@@ -165,7 +201,7 @@ func pollLoop() string {
 			}
 			flog.Printf("using configuration: %+v", cfg)
 
-		case <-time.After(config.Sleep):
+		case <-time.After(sleep):
 
 			err = fetch(cfg.URL)
 			if err != nil {

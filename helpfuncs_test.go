@@ -73,6 +73,7 @@ func initTest() {
 
 	// (2)
 	cfg = testCfg()
+	sleep = time.Second * 10
 
 	// (3)
 	data, err := json.MarshalIndent(cfg, "", "  ")
@@ -110,7 +111,6 @@ func testCfg() *config.Config {
 	c.Port = 2525
 	c.CycleLen = 10
 	c.CycleUnit = "seconds"
-	config.Sleep = time.Second * 10
 	return c
 }
 
