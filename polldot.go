@@ -126,7 +126,7 @@ func initConfig() error {
 	return nil
 }
 
-// catchSignals catches signals SIGHUP, SIGINT, SIGTERM and SIGUSR1.
+// catchSignals catches os signals SIGHUP, SIGINT, SIGTERM and SIGUSR1.
 // SIGHUP triggers a reload of the configuration.
 // SIGINT, SIGTERM and SIGUSR1 will make the program exit.
 func catchSignals() {
